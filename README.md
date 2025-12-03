@@ -73,7 +73,7 @@ export default defineConfig({
             input: [
                 'resources/css/app.css',
                 'resources/js/app.js',
-                'resources/css/filament/merchant/theme.css',
+                'resources/css/filament/admin/theme.css',
                 'resources/js/vendor/filament-pdf-sanitizer/init.js', // Add this
             ],
             refresh: true,

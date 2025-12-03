@@ -1,13 +1,13 @@
 {
-    "name": "filament/pdf-sanitizer",
+    "name": "laminblur/filament-pdf-sanitizer",
     "description": "A Filament plugin that automatically sanitizes PDF files by removing JavaScript, forms, and annotations before upload to prevent WAF blocking",
     "type": "library",
     "version": "1.0.0",
     "license": "MIT",
     "authors": [
         {
-            "name": "Your Name",
-            "email": "your.email@example.com"
+            "name": "laminblur",
+            "email": "laminblur@gmail.com"
         }
     ],
     "require": {

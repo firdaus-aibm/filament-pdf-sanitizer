@@ -2,8 +2,18 @@
 let pdfSanitizerLoaded = false;
 let pdfSanitizerPromise = null;
 
-// Get worker path from window config or use default
-const workerPath = window.filamentPdfSanitizerWorkerPath || '/vendor/filament-pdf-sanitizer/pdf.worker.min.js';
+// Get config from window object
+function getConfig() {
+    return window.filamentPdfSanitizerConfig || {
+        workerPath: '/vendor/filament-pdf-sanitizer/pdf.worker.min.js',
+        scale: 1.5,
+        quality: 0.85,
+        maxFileSizeMb: null,
+        maxPages: null,
+        showProgress: true,
+        logErrors: true,
+    };
+}
 
 // Function to lazy load PDF sanitizer
 function loadPdfSanitizer() {
@@ -12,19 +22,41 @@ function loadPdfSanitizer() {
     }
 
     if (!pdfSanitizerPromise) {
+        const config = getConfig();
         pdfSanitizerPromise = import('./pdf-sanitizer.js').then(({ setupPdfSanitization }) => {
-            setupPdfSanitization(workerPath);
+            setupPdfSanitization({ workerPath: config.workerPath });
             pdfSanitizerLoaded = true;
+        }).catch((error) => {
+            console.error('[Filament PDF Sanitizer] Failed to load sanitizer', error);
+            pdfSanitizerPromise = null; // Reset on error
+            throw error;
         });
     }
 
     return pdfSanitizerPromise;
 }
 
+// Check if file input accepts PDFs
+function acceptsPdf(input) {
+    if (!input || input.type !== 'file') return false;
+    
+    // Check accept attribute
+    const accept = input.getAttribute('accept');
+    if (accept && !accept.includes('pdf') && !accept.includes('application/pdf')) {
+        return false;
+    }
+    
+    return true;
+}
+
 // Check for file inputs on page load
 function checkForFileInputs() {
-    if (document.querySelector('input[type="file"]')) {
-        loadPdfSanitizer();
+    const fileInputs = document.querySelectorAll('input[type="file"]');
+    for (const input of fileInputs) {
+        if (acceptsPdf(input)) {
+            loadPdfSanitizer();
+            return;
+        }
     }
 }
 
@@ -33,11 +65,22 @@ const observer = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
             if (node.nodeType === Node.ELEMENT_NODE) {
-                // Check if the added node or its children contain file inputs
-                if ((node.matches && node.matches('input[type="file"]')) ||
-                    (node.querySelector && node.querySelector('input[type="file"]'))) {
-                    loadPdfSanitizer();
-                    break;
+                // Check if the added node is a file input
+                if (node.matches && node.matches('input[type="file"]')) {
+                    if (acceptsPdf(node)) {
+                        loadPdfSanitizer();
+                        break;
+                    }
+                }
+                // Check if children contain file inputs
+                if (node.querySelector) {
+                    const fileInputs = node.querySelectorAll('input[type="file"]');
+                    for (const input of fileInputs) {
+                        if (acceptsPdf(input)) {
+                            loadPdfSanitizer();
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -58,15 +101,23 @@ if (document.readyState === 'loading') {
 // Also watch for Livewire initialization (in case file inputs are added via Livewire)
 if (typeof window.Livewire !== 'undefined') {
     window.Livewire.hook('morph.updated', () => {
-        if (document.querySelector('input[type="file"]')) {
-            loadPdfSanitizer();
+        const fileInputs = document.querySelectorAll('input[type="file"]');
+        for (const input of fileInputs) {
+            if (acceptsPdf(input)) {
+                loadPdfSanitizer();
+                break;
+            }
         }
     });
 } else {
     document.addEventListener('livewire:init', () => {
         window.Livewire.hook('morph.updated', () => {
-            if (document.querySelector('input[type="file"]')) {
-                loadPdfSanitizer();
+            const fileInputs = document.querySelectorAll('input[type="file"]');
+            for (const input of fileInputs) {
+                if (acceptsPdf(input)) {
+                    loadPdfSanitizer();
+                    break;
+                }
             }
         });
     });

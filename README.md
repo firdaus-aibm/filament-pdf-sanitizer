@@ -21,6 +21,11 @@ When uploading PDFs through Filament's FileUpload component, files containing em
 - 📦 **Lightweight** - Optimized bundle size with code splitting and dynamic imports
 - 🔄 **Smart Caching** - Caches sanitized files to prevent re-processing on retry
 - 🛡️ **WAF Compatible** - Prevents AWS WAF and other security systems from blocking uploads
+- 📊 **Progress Indicators** - Visual feedback during PDF sanitization
+- ⚙️ **Configurable** - Customize quality, scale, file size limits, and more
+- 🧹 **Memory Efficient** - Automatic cleanup of canvas elements and memory management
+- 🚨 **Error Handling** - Graceful error handling with console logging
+- 📏 **File Size Limits** - Configurable maximum file size and page count limits
 
 ## 📋 Requirements
 
@@ -52,21 +57,9 @@ php artisan vendor:publish --tag=filament-pdf-sanitizer-assets
 php artisan vendor:publish --tag=filament-pdf-sanitizer-config
 ```
 
-### Step 4: Copy PDF Worker File
+> **Note:** The PDF worker file is automatically copied to `public/vendor/filament-pdf-sanitizer/` when the package is installed. If you need to update it, run the publish command again with the `--force` flag.
 
-**Windows (PowerShell):**
-
-```powershell
-Copy-Item vendor/laminblur/filament-pdf-sanitizer/public/pdf.worker.min.js public/vendor/filament-pdf-sanitizer/
-```
-
-**Linux/Mac:**
-
-```bash
-cp vendor/laminblur/filament-pdf-sanitizer/public/pdf.worker.min.js public/vendor/filament-pdf-sanitizer/
-```
-
-### Step 5: Update Vite Config (Optional)
+### Step 4: Update Vite Config (Optional)
 
 If you want to explicitly include the package assets in your build, add to `vite.config.js`:
 
@@ -89,7 +82,7 @@ export default defineConfig({
 });
 ```
 
-### Step 6: Rebuild Assets
+### Step 5: Rebuild Assets
 
 ```bash
 npm run build
@@ -125,16 +118,24 @@ class AdminPanelProvider extends PanelProvider
 
 That's it! The plugin will automatically sanitize all PDF uploads in your Filament panels.
 
-### Custom Worker Path
+### Configuration Options
 
-If you need to customize the PDF worker path:
+You can configure the plugin in two ways:
+
+#### Method 1: Plugin Methods (Per Panel)
 
 ```php
 FilamentPdfSanitizerPlugin::make()
     ->workerPath('/custom/path/to/pdf.worker.min.js')
+    ->scale(2.0) // Higher quality (default: 1.5)
+    ->quality(0.95) // JPEG quality 0.0-1.0 (default: 0.85)
+    ->maxFileSizeMb(100) // Max file size in MB (default: 50)
+    ->maxPages(100) // Max pages to process (default: null = unlimited)
+    ->showProgress(true) // Show progress indicator (default: true)
+    ->logErrors(true) // Log errors to console (default: true)
 ```
 
-### Configuration
+#### Method 2: Config File (Global)
 
 Publish and edit the config file:
 
@@ -166,15 +167,82 @@ return [
     |
     */
     'enabled' => true,
+
+    /*
+    |--------------------------------------------------------------------------
+    | PDF Rendering Scale
+    |--------------------------------------------------------------------------
+    |
+    | The scale factor for rendering PDF pages. Higher values produce better
+    | quality but larger file sizes. Recommended range: 1.0 - 3.0
+    |
+    */
+    'scale' => 1.5,
+
+    /*
+    |--------------------------------------------------------------------------
+    | JPEG Quality
+    |--------------------------------------------------------------------------
+    |
+    | The JPEG quality for rendered pages (0.0 - 1.0). Higher values produce
+    | better quality but larger file sizes. Recommended range: 0.7 - 0.95
+    |
+    */
+    'quality' => 0.85,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Maximum File Size (MB)
+    |--------------------------------------------------------------------------
+    |
+    | Maximum PDF file size to sanitize. Files larger than this will be
+    | skipped. Set to null to disable size checking.
+    |
+    */
+    'max_file_size_mb' => 50,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Maximum Pages
+    |--------------------------------------------------------------------------
+    |
+    | Maximum number of pages to process. PDFs with more pages will be
+    | skipped. Set to null to disable page limit.
+    |
+    */
+    'max_pages' => null,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Show Progress Indicator
+    |--------------------------------------------------------------------------
+    |
+    | Whether to show a visual progress indicator during sanitization.
+    |
+    */
+    'show_progress' => true,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Log Errors
+    |--------------------------------------------------------------------------
+    |
+    | Whether to log sanitization errors to the browser console.
+    |
+    */
+    'log_errors' => true,
 ];
 ```
 
 ## 🔧 How It Works
 
 1. **Detection**: The plugin detects when a PDF file is selected in a file input
-2. **Sanitization**: Each PDF page is rendered to a canvas, converted to a JPEG image, and rebuilt as a clean PDF
-3. **Interception**: The sanitized PDF replaces the original file before the upload request is sent
-4. **Caching**: Sanitized files are cached using WeakMap to prevent re-processing on retry
+2. **Validation**: Checks file size and page count limits (if configured)
+3. **Sanitization**: Each PDF page is rendered to a canvas, converted to a JPEG image, and rebuilt as a clean PDF
+4. **Progress**: Shows visual progress indicator during sanitization (if enabled)
+5. **Interception**: The sanitized PDF replaces the original file before the upload request is sent
+6. **Caching**: Sanitized files are cached using WeakMap to prevent re-processing on retry
+7. **Cleanup**: Canvas elements and memory are automatically cleaned up after processing
 
 ### What Gets Removed ❌
 
@@ -204,17 +272,20 @@ return [
 
 If you see errors about the PDF worker file:
 
-1. Ensure assets are published:
+1. The worker file should be automatically copied when the package is installed. If it's missing, publish assets:
    ```bash
    php artisan vendor:publish --tag=filament-pdf-sanitizer-assets --force
    ```
 
-2. Copy the worker file:
-   ```bash
-   cp vendor/laminblur/filament-pdf-sanitizer/public/pdf.worker.min.js public/vendor/filament-pdf-sanitizer/
-   ```
+2. Verify the file exists at: `public/vendor/filament-pdf-sanitizer/pdf.worker.min.js`
 
-3. Verify the file is accessible at: `/vendor/filament-pdf-sanitizer/pdf.worker.min.js`
+3. Verify the file is accessible via URL: `/vendor/filament-pdf-sanitizer/pdf.worker.min.js`
+
+4. If the file still doesn't exist, ensure the `public` directory is writable and try clearing the application cache:
+   ```bash
+   php artisan cache:clear
+   php artisan config:clear
+   ```
 
 ### Upload Still Blocked
 

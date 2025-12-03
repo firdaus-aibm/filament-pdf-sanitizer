@@ -1,6 +1,6 @@
 # Filament PDF Sanitizer
 
-[![Latest Version](https://img.shields.io/github/v/release/laminblur/filament-pdf-sanitizer?style=flat-square)](https://github.com/laminblur/filament-pdf-sanitizer/releases)
+[![Latest Version](https://img.shields.io/packagist/v/laminblur/filament-pdf-sanitizer?style=flat-square)](https://packagist.org/packages/laminblur/filament-pdf-sanitizer)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen?style=flat-square)](LICENSE)
 [![PHP Version](https://img.shields.io/badge/php-8.2%2B-blue?style=flat-square)](https://php.net)
 [![Laravel](https://img.shields.io/badge/laravel-11%2B%20%7C%2012%2B-red?style=flat-square)](https://laravel.com)
@@ -33,57 +33,75 @@ When uploading PDFs through Filament's FileUpload component, files containing em
 
 ### Step 1: Install via Composer
 
-Add the repository to your `composer.json`:
+Install the package directly from [Packagist](https://packagist.org/packages/laminblur/filament-pdf-sanitizer):
 
-{
-"repositories": [
-{
-"type": "vcs",
-"url": "https://github.com/laminblur/filament-pdf-sanitizer"
-}
-],
-"require": {
-"filament/pdf-sanitizer": "dev-main"
-}
-}Then run:
+```bash
+composer require laminblur/filament-pdf-sanitizer
+```
 
-composer require filament/pdf-sanitizer:dev-main### Step 2: Install NPM Dependencies
+### Step 2: Install NPM Dependencies
 
-npm install jspdf pdfjs-dist### Step 3: Publish Assets
+```bash
+npm install jspdf pdfjs-dist
+```
 
+### Step 3: Publish Assets
+
+```bash
 php artisan vendor:publish --tag=filament-pdf-sanitizer-assets
 php artisan vendor:publish --tag=filament-pdf-sanitizer-config
+```
+
 ### Step 4: Copy PDF Worker File
 
 **Windows (PowerShell):**
-Copy-Item vendor/filament/pdf-sanitizer/public/pdf.worker.min.js public/vendor/filament-pdf-sanitizer/**Linux/Mac:**
-cp vendor/filament/pdf-sanitizer/public/pdf.worker.min.js public/vendor/filament-pdf-sanitizer/### Step 5: Update Vite Config (Optional)
+
+```powershell
+Copy-Item vendor/laminblur/filament-pdf-sanitizer/public/pdf.worker.min.js public/vendor/filament-pdf-sanitizer/
+```
+
+**Linux/Mac:**
+
+```bash
+cp vendor/laminblur/filament-pdf-sanitizer/public/pdf.worker.min.js public/vendor/filament-pdf-sanitizer/
+```
+
+### Step 5: Update Vite Config (Optional)
 
 If you want to explicitly include the package assets in your build, add to `vite.config.js`:
 
+```javascript
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 
 export default defineConfig({
-plugins: [
-laravel({
-input: [
-"resources/css/app.css",
-"resources/js/app.js",
-"resources/css/filament/merchant/theme.css",
-"resources/js/vendor/filament-pdf-sanitizer/init.js", // Add this
-],
-refresh: true,
-}),
-],
-});### Step 6: Rebuild Assets
+    plugins: [
+        laravel({
+            input: [
+                'resources/css/app.css',
+                'resources/js/app.js',
+                'resources/css/filament/merchant/theme.css',
+                'resources/js/vendor/filament-pdf-sanitizer/init.js', // Add this
+            ],
+            refresh: true,
+        }),
+    ],
+});
+```
 
-npm run build## 🚀 Usage
+### Step 6: Rebuild Assets
+
+```bash
+npm run build
+```
+
+## 🚀 Usage
 
 ### Basic Usage
 
 Add the plugin to your Filament panel provider:
 
+```php
 <?php
 
 namespace App\Providers\Filament;
@@ -102,19 +120,31 @@ class AdminPanelProvider extends PanelProvider
                 // ... other plugins
             ]);
     }
-}That's it! The plugin will automatically sanitize all PDF uploads in your Filament panels.
+}
+```
+
+That's it! The plugin will automatically sanitize all PDF uploads in your Filament panels.
 
 ### Custom Worker Path
 
 If you need to customize the PDF worker path:
-p
+
+```php
 FilamentPdfSanitizerPlugin::make()
-    ->workerPath('/custom/path/to/pdf.worker.min.js')### Configuration
+    ->workerPath('/custom/path/to/pdf.worker.min.js')
+```
+
+### Configuration
 
 Publish and edit the config file:
 
-php artisan vendor:publish --tag=filament-pdf-sanitizer-configEdit `config/pdf-sanitizer.php`:
+```bash
+php artisan vendor:publish --tag=filament-pdf-sanitizer-config
+```
 
+Edit `config/pdf-sanitizer.php`:
+
+```php
 return [
     /*
     |--------------------------------------------------------------------------
@@ -136,7 +166,10 @@ return [
     |
     */
     'enabled' => true,
-];## 🔧 How It Works
+];
+```
+
+## 🔧 How It Works
 
 1. **Detection**: The plugin detects when a PDF file is selected in a file input
 2. **Sanitization**: Each PDF page is rendered to a canvas, converted to a JPEG image, and rebuilt as a clean PDF
@@ -172,10 +205,16 @@ return [
 If you see errors about the PDF worker file:
 
 1. Ensure assets are published:
+   ```bash
    php artisan vendor:publish --tag=filament-pdf-sanitizer-assets --force
-   2. Copy the worker file:
-   cp vendor/filament/pdf-sanitizer/public/pdf.worker.min.js public/vendor/filament-pdf-sanitizer/
-   3. Verify the file is accessible at: `/vendor/filament-pdf-sanitizer/pdf.worker.min.js`
+   ```
+
+2. Copy the worker file:
+   ```bash
+   cp vendor/laminblur/filament-pdf-sanitizer/public/pdf.worker.min.js public/vendor/filament-pdf-sanitizer/
+   ```
+
+3. Verify the file is accessible at: `/vendor/filament-pdf-sanitizer/pdf.worker.min.js`
 
 ### Upload Still Blocked
 
@@ -237,6 +276,7 @@ For issues and questions, please [open an issue](https://github.com/laminblur/fi
 
 ## 🔗 Links
 
+- [Packagist](https://packagist.org/packages/laminblur/filament-pdf-sanitizer)
 - [GitHub Repository](https://github.com/laminblur/filament-pdf-sanitizer)
 - [Filament Documentation](https://filamentphp.com/docs)
 - [Report a Bug](https://github.com/laminblur/filament-pdf-sanitizer/issues)

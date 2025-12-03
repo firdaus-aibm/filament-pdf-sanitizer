@@ -15,7 +15,7 @@ function getConfig() {
         showProgress: true,
         logErrors: true,
     };
-    
+
     // Ensure boolean values are actually booleans (Blade @js might convert them)
     return {
         ...config,
@@ -63,8 +63,8 @@ function logInfo(message) {
  */
 function isPdfFile(file) {
     if (!file) return false;
-    return file.type === 'application/pdf' || 
-           file.name.toLowerCase().endsWith('.pdf');
+    return file.type === 'application/pdf' ||
+        file.name.toLowerCase().endsWith('.pdf');
 }
 
 /**
@@ -87,101 +87,200 @@ function checkFileSize(file) {
 function showProgress(input, message = 'Sanitizing PDF...') {
     const config = getConfig();
     if (!config.showProgress) {
+        logInfo('Progress indicator disabled in config');
         return null;
     }
 
     if (!input) {
+        logWarning('Cannot show progress: input element is null');
         return null;
     }
 
-    // Try multiple selectors to find the wrapper (Filament 3.x structure)
-    const wrapper = input.closest('.fi-fo-file-upload-wrapper') ||
-                    input.closest('.filament-forms-file-upload-component') ||
-                    input.closest('.fi-input-wrp') ||
-                    input.closest('.fi-input') ||
-                    input.parentElement?.parentElement;
-    
-    if (!wrapper) {
-        // If no wrapper found, create one around the input
-        const container = document.createElement('div');
-        container.style.cssText = 'position: relative; display: inline-block; width: 100%;';
-        input.parentNode?.insertBefore(container, input);
-        container.appendChild(input);
-        return showProgress(input, message);
+    logInfo(`Attempting to show progress indicator for input: ${input.name || input.id || 'unnamed'}`);
+
+    // Find Filament FileUpload wrapper (prioritize Filament-specific classes)
+    let element = input;
+    let wrapper = null;
+    let attempts = 0;
+    const maxAttempts = 15;
+
+    // Priority order: FileUpload wrapper > Field wrapper > Input wrapper
+    const prioritySelectors = [
+        'fi-fo-file-upload-wrapper',
+        'fi-fo-field-wrp',
+        'fi-input-wrp',
+        'fi-input'
+    ];
+
+    while (element && attempts < maxAttempts) {
+        // Check priority selectors first
+        for (const className of prioritySelectors) {
+            if (element.classList?.contains(className)) {
+                const rect = element.getBoundingClientRect();
+                // Must have visible dimensions
+                if (rect.width > 0 && rect.height > 0) {
+                    wrapper = element;
+                    break;
+                }
+            }
+        }
+
+        if (wrapper) break;
+
+        // Fallback: check for div containers with reasonable size
+        if (element.tagName === 'DIV' && element.classList.length > 0) {
+            const rect = element.getBoundingClientRect();
+            if (rect.width > 100 && rect.height > 50) {
+                wrapper = element;
+                break;
+            }
+        }
+
+        element = element.parentElement;
+        attempts++;
     }
+
+    // Fallback: use the input's parent or create a wrapper
+    if (!wrapper) {
+        wrapper = input.parentElement;
+        if (!wrapper || wrapper === document.body) {
+            // Create a wrapper div
+            wrapper = document.createElement('div');
+            wrapper.style.cssText = 'position: relative; display: inline-block; width: 100%;';
+            input.parentNode?.insertBefore(wrapper, input);
+            wrapper.appendChild(input);
+        }
+    }
+
+    logInfo(`Found wrapper element: ${wrapper.tagName}.${wrapper.className}`);
 
     // Ensure wrapper has relative positioning
     const wrapperPosition = window.getComputedStyle(wrapper).position;
     if (wrapperPosition === 'static' || !wrapperPosition) {
         wrapper.style.position = 'relative';
+        logInfo('Set wrapper position to relative');
     }
 
-    // Create or update progress indicator
-    let indicator = wrapper.querySelector('.pdf-sanitizer-progress');
+    // Check if progress indicator already exists
+    let indicator = wrapper.querySelector('.pdf-sanitizer-progress-overlay');
+
     if (!indicator) {
-        indicator = document.createElement('div');
-        indicator.className = 'pdf-sanitizer-progress';
-        indicator.setAttribute('data-pdf-sanitizer-progress', 'true');
-        indicator.style.cssText = `
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.85);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            z-index: 9999;
-            border-radius: 0.5rem;
-            color: white;
-            font-size: 0.875rem;
-            font-weight: 500;
-            backdrop-filter: blur(2px);
-        `;
+        // Clone from template if available, otherwise create new
+        const template = document.querySelector('#pdf-sanitizer-progress-template');
+        const templateOverlay = template?.querySelector('.pdf-sanitizer-progress-overlay');
+
+        if (templateOverlay) {
+            indicator = templateOverlay.cloneNode(true);
+            logInfo('Cloned progress indicator from template');
+        } else {
+            // Create new indicator matching Filament design (fallback)
+            indicator = document.createElement('div');
+            indicator.className = 'pdf-sanitizer-progress-overlay';
+            indicator.setAttribute('data-pdf-sanitizer-indicator', 'true');
+            indicator.style.cssText = `
+                position: absolute;
+                inset: 0;
+                background: rgba(17, 24, 39, 0.75);
+                backdrop-filter: blur(4px);
+                -webkit-backdrop-filter: blur(4px);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 50;
+                border-radius: 0.5rem;
+                transition: opacity 0.2s ease-in-out;
+            `;
+
+            const content = document.createElement('div');
+            content.className = 'pdf-sanitizer-progress-content';
+            content.style.cssText = 'display: flex; flex-direction: column; align-items: center; gap: 0.75rem; padding: 1rem;';
+
+            // Create Filament-style SVG spinner
+            const spinner = document.createElement('div');
+            spinner.className = 'pdf-sanitizer-spinner';
+            spinner.style.cssText = 'width: 2rem; height: 2rem; color: rgb(59, 130, 246); flex-shrink: 0;';
+
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('class', 'pdf-sanitizer-spinner-svg');
+            svg.setAttribute('viewBox', '0 0 24 24');
+            svg.setAttribute('fill', 'none');
+            svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            svg.style.cssText = 'width: 100%; height: 100%; animation: pdf-sanitizer-spin 1s linear infinite;';
+
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('class', 'pdf-sanitizer-spinner-circle');
+            circle.setAttribute('cx', '12');
+            circle.setAttribute('cy', '12');
+            circle.setAttribute('r', '10');
+            circle.setAttribute('stroke', 'currentColor');
+            circle.setAttribute('stroke-width', '4');
+            circle.setAttribute('stroke-linecap', 'round');
+            circle.setAttribute('stroke-dasharray', '32');
+            circle.setAttribute('stroke-dashoffset', '32');
+            circle.style.opacity = '0.25';
+
+            svg.appendChild(circle);
+            spinner.appendChild(svg);
+
+            const messageEl = document.createElement('div');
+            messageEl.className = 'pdf-sanitizer-message';
+            messageEl.textContent = message;
+            messageEl.style.cssText = 'font-size: 0.875rem; font-weight: 500; line-height: 1.25rem; color: rgb(249, 250, 251); text-align: center;';
+
+            const percentEl = document.createElement('div');
+            percentEl.className = 'pdf-sanitizer-percent';
+            percentEl.style.cssText = 'font-size: 0.75rem; line-height: 1rem; color: rgb(156, 163, 175); font-weight: 400;';
+
+            // Add spinner animation if not already in document
+            if (!document.getElementById('pdf-sanitizer-spin-animation')) {
+                const style = document.createElement('style');
+                style.id = 'pdf-sanitizer-spin-animation';
+                style.textContent = `
+                    @keyframes pdf-sanitizer-spin {
+                        from { transform: rotate(0deg); }
+                        to { transform: rotate(360deg); }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+
+            content.appendChild(spinner);
+            content.appendChild(messageEl);
+            content.appendChild(percentEl);
+            indicator.appendChild(content);
+
+            logInfo('Created new progress indicator with Filament-style fallback');
+        }
+
         wrapper.appendChild(indicator);
     }
 
-    const messageEl = indicator.querySelector('.pdf-sanitizer-message') || document.createElement('div');
-    messageEl.className = 'pdf-sanitizer-message';
-    messageEl.textContent = message;
-    messageEl.style.cssText = 'margin-bottom: 0.5rem; font-weight: 500;';
-    
-    if (!indicator.querySelector('.pdf-sanitizer-message')) {
-        indicator.appendChild(messageEl);
+    // Update message and ensure it's visible
+    const messageEl = indicator.querySelector('.pdf-sanitizer-message');
+    if (messageEl) {
+        messageEl.textContent = message;
+    } else {
+        // If message element doesn't exist, create it (fallback)
+        const content = indicator.querySelector('.pdf-sanitizer-progress-content') || indicator;
+        const msgEl = document.createElement('div');
+        msgEl.className = 'pdf-sanitizer-message';
+        msgEl.textContent = message;
+        msgEl.style.cssText = 'font-size: 0.875rem; font-weight: 500; line-height: 1.25rem; text-align: center;';
+        content.appendChild(msgEl);
     }
 
-    const spinner = indicator.querySelector('.pdf-sanitizer-spinner') || document.createElement('div');
-    spinner.className = 'pdf-sanitizer-spinner';
-    spinner.style.cssText = `
-        width: 2rem;
-        height: 2rem;
-        border: 3px solid rgba(255, 255, 255, 0.3);
-        border-top-color: white;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-    `;
-    
-    if (!indicator.querySelector('.pdf-sanitizer-spinner')) {
-        indicator.appendChild(spinner);
-    }
-
-    // Add spinner animation if not already in document
-    if (!document.getElementById('pdf-sanitizer-styles')) {
-        const style = document.createElement('style');
-        style.id = 'pdf-sanitizer-styles';
-        style.textContent = `
-            @keyframes spin {
-                to { transform: rotate(360deg); }
-            }
-        `;
-        document.head.appendChild(style);
-    }
-
+    // Show the indicator and set loading state
     indicator.style.display = 'flex';
+    indicator.style.visibility = 'visible';
+
+    // Set Filament-compatible loading state attribute
+    wrapper.setAttribute('data-pdf-sanitizing', 'true');
+
+    // Apply loading styles (CSS will handle pointer-events and opacity)
     wrapper.style.pointerEvents = 'none';
-    wrapper.style.opacity = '0.8';
+    wrapper.style.opacity = '0.7';
+
+    logInfo(`Progress indicator displayed on wrapper: ${wrapper.tagName}.${wrapper.className}`);
 
     return indicator;
 }
@@ -191,20 +290,67 @@ function showProgress(input, message = 'Sanitizing PDF...') {
  */
 function hideProgress(input) {
     if (!input) return;
-    
-    const wrapper = input.closest('.fi-fo-file-upload-wrapper') ||
-                    input.closest('.filament-forms-file-upload-component') ||
-                    input.closest('.fi-input-wrp') ||
-                    input.closest('.fi-input') ||
-                    input.parentElement?.parentElement;
-    
-    if (wrapper) {
-        const indicator = wrapper.querySelector('.pdf-sanitizer-progress');
-        if (indicator) {
-            indicator.style.display = 'none';
+
+    // Find wrapper using same logic as showProgress
+    let element = input;
+    let wrapper = null;
+    let attempts = 0;
+    const maxAttempts = 15;
+
+    const prioritySelectors = [
+        'fi-fo-file-upload-wrapper',
+        'fi-fo-field-wrp',
+        'fi-input-wrp',
+        'fi-input'
+    ];
+
+    while (element && attempts < maxAttempts) {
+        for (const className of prioritySelectors) {
+            if (element.classList?.contains(className)) {
+                const rect = element.getBoundingClientRect();
+                if (rect.width > 0 && rect.height > 0) {
+                    wrapper = element;
+                    break;
+                }
+            }
         }
-        wrapper.style.pointerEvents = '';
-        wrapper.style.opacity = '';
+        if (wrapper) break;
+
+        if (element.tagName === 'DIV' && element.classList.length > 0) {
+            const rect = element.getBoundingClientRect();
+            if (rect.width > 100 && rect.height > 50) {
+                wrapper = element;
+                break;
+            }
+        }
+        element = element.parentElement;
+        attempts++;
+    }
+
+    if (!wrapper) {
+        wrapper = input.parentElement;
+    }
+
+    if (wrapper) {
+        const indicator = wrapper.querySelector('.pdf-sanitizer-progress-overlay');
+        if (indicator) {
+            // Fade out animation
+            indicator.style.opacity = '0';
+            indicator.style.transition = 'opacity 0.2s ease-in-out';
+
+            setTimeout(() => {
+                indicator.remove();
+                wrapper.removeAttribute('data-pdf-sanitizing');
+                wrapper.style.pointerEvents = '';
+                wrapper.style.opacity = '';
+                logInfo('Progress indicator hidden');
+            }, 200);
+        } else {
+            // Clean up attributes even if indicator not found
+            wrapper.removeAttribute('data-pdf-sanitizing');
+            wrapper.style.pointerEvents = '';
+            wrapper.style.opacity = '';
+        }
     }
 }
 
@@ -213,19 +359,59 @@ function hideProgress(input) {
  */
 function updateProgress(input, message, percent = null) {
     if (!input) return;
-    
-    const wrapper = input.closest('.fi-fo-file-upload-wrapper') ||
-                    input.closest('.filament-forms-file-upload-component') ||
-                    input.closest('.fi-input-wrp') ||
-                    input.closest('.fi-input') ||
-                    input.parentElement?.parentElement;
-    
+
+    // Find wrapper using same improved logic as showProgress
+    let element = input;
+    let wrapper = null;
+    let attempts = 0;
+    const maxAttempts = 15;
+
+    const prioritySelectors = [
+        'fi-fo-file-upload-wrapper',
+        'fi-fo-field-wrp',
+        'fi-input-wrp',
+        'fi-input'
+    ];
+
+    while (element && attempts < maxAttempts) {
+        for (const className of prioritySelectors) {
+            if (element.classList?.contains(className)) {
+                const rect = element.getBoundingClientRect();
+                if (rect.width > 0 && rect.height > 0) {
+                    wrapper = element;
+                    break;
+                }
+            }
+        }
+        if (wrapper) break;
+
+        if (element.tagName === 'DIV' && element.classList.length > 0) {
+            const rect = element.getBoundingClientRect();
+            if (rect.width > 100 && rect.height > 50) {
+                wrapper = element;
+                break;
+            }
+        }
+        element = element.parentElement;
+        attempts++;
+    }
+
+    if (!wrapper) {
+        wrapper = input.parentElement;
+    }
+
     if (wrapper) {
-        const indicator = wrapper.querySelector('.pdf-sanitizer-progress');
+        const indicator = wrapper.querySelector('.pdf-sanitizer-progress-overlay');
         if (indicator) {
             const messageEl = indicator.querySelector('.pdf-sanitizer-message');
+            const percentEl = indicator.querySelector('.pdf-sanitizer-percent');
+
             if (messageEl) {
-                messageEl.textContent = percent !== null ? `${message} (${percent}%)` : message;
+                messageEl.textContent = message;
+            }
+
+            if (percentEl) {
+                percentEl.textContent = percent !== null ? `${percent}%` : '';
             }
         }
     }
@@ -269,7 +455,7 @@ export async function sanitizePdf(file, options = {}) {
 
     const config = getConfig();
     logInfo(`Config loaded - showProgress: ${config.showProgress}, logErrors: ${config.logErrors}`);
-    
+
     const {
         workerPath = config.workerPath,
         scale = config.scale,
@@ -405,10 +591,38 @@ function initSanitization(workerPath) {
     const config = getConfig();
     logInfo('Initializing PDF sanitization...');
     logInfo(`Configuration: showProgress=${config.showProgress}, logErrors=${config.logErrors}, workerPath=${workerPath}`);
-    
+
+    // Verify template is available
+    const template = document.querySelector('#pdf-sanitizer-progress-template');
+    if (template) {
+        logInfo('Progress indicator template found in DOM');
+    } else {
+        logWarning('Progress indicator template NOT found in DOM - will use fallback creation');
+    }
+
     // Store sanitized files for upload interception
     const sanitizedFilesCache = new WeakMap();
     const processingFiles = new WeakSet();
+
+    // Expose test function for debugging
+    window.testPdfSanitizerProgress = function (inputSelector = 'input[type="file"][data-pdf-sanitize="true"]') {
+        const input = document.querySelector(inputSelector);
+        if (!input) {
+            console.error('No input found with selector:', inputSelector);
+            return;
+        }
+        console.log('Testing progress indicator on:', input);
+        const indicator = showProgress(input, 'Test: Sanitizing PDF...');
+        if (indicator) {
+            console.log('Progress indicator created successfully');
+            setTimeout(() => {
+                hideProgress(input);
+                console.log('Progress indicator hidden');
+            }, 3000);
+        } else {
+            console.error('Failed to create progress indicator');
+        }
+    };
 
     // Helper function to sanitize a file with progress
     async function sanitizeFileWithProgress(file, input) {
@@ -425,11 +639,11 @@ function initSanitization(workerPath) {
         }
 
         processingFiles.add(file);
-        
+
         logInfo(`Starting sanitization for file: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
-        
+
         const progressIndicator = showProgress(input, 'Sanitizing PDF...');
-        
+
         if (!progressIndicator && getConfig().showProgress) {
             logWarning('Progress indicator could not be created - wrapper element not found');
         }
@@ -478,7 +692,7 @@ function initSanitization(workerPath) {
                     if (value instanceof File && isPdfFile(value)) {
                         // Find the input element that corresponds to this file
                         const input = document.querySelector(`input[type="file"][name="${key}"], input[type="file"][data-pdf-sanitize="true"]`);
-                        
+
                         // Only sanitize if input is marked for sanitization
                         if (!input || !shouldSanitizeInput(input)) {
                             sanitizedEntries.push([key, value]);
@@ -540,7 +754,7 @@ function initSanitization(workerPath) {
                     if (value instanceof File && isPdfFile(value)) {
                         // Find the input element that corresponds to this file
                         const input = document.querySelector(`input[type="file"][name="${key}"], input[type="file"][data-pdf-sanitize="true"]`);
-                        
+
                         // Only sanitize if input is marked for sanitization
                         if (!input || !shouldSanitizeInput(input)) {
                             sanitizedEntries.push([key, value]);
@@ -602,8 +816,8 @@ function initSanitization(workerPath) {
      */
     function shouldSanitizeInput(input) {
         // Only sanitize if the input has the data-pdf-sanitize attribute set to 'true'
-        return input.hasAttribute('data-pdf-sanitize') && 
-               input.getAttribute('data-pdf-sanitize') === 'true';
+        return input.hasAttribute('data-pdf-sanitize') &&
+            input.getAttribute('data-pdf-sanitize') === 'true';
     }
 
     // Function to sanitize files in an input

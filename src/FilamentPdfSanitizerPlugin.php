@@ -1,17 +1,15 @@
 <?php
 
-namespace Filament\PdfSanitizer;
+namespace Laminblur\FilamentPdfSanitizer;
 
+use Filament\Contracts\Plugin;
 use Filament\Panel;
-use Filament\Support\Concerns\EvaluatesClosures;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Config;
 
-class FilamentPdfSanitizerPlugin
+class FilamentPdfSanitizerPlugin implements Plugin
 {
-    use EvaluatesClosures;
-
     protected ?string $workerPath = null;
     protected ?float $scale = null;
     protected ?float $quality = null;
@@ -20,6 +18,25 @@ class FilamentPdfSanitizerPlugin
     protected bool $showProgress = true;
     protected bool $logErrors = true;
 
+    /**
+     * Create a new plugin instance.
+     */
+    public static function make(): static
+    {
+        return app(static::class);
+    }
+
+    /**
+     * Get the unique identifier for this plugin.
+     */
+    public function getId(): string
+    {
+        return 'filament-pdf-sanitizer';
+    }
+
+    /**
+     * Set the PDF worker path.
+     */
     public function workerPath(?string $path): static
     {
         $this->workerPath = $path;
@@ -27,34 +44,65 @@ class FilamentPdfSanitizerPlugin
         return $this;
     }
 
+    /**
+     * Set the PDF rendering scale (1.0 - 3.0 recommended).
+     */
     public function scale(?float $scale): static
     {
+        if ($scale !== null && ($scale < 0.5 || $scale > 5.0)) {
+            throw new \InvalidArgumentException('Scale must be between 0.5 and 5.0');
+        }
+
         $this->scale = $scale;
 
         return $this;
     }
 
+    /**
+     * Set the JPEG quality (0.0 - 1.0).
+     */
     public function quality(?float $quality): static
     {
+        if ($quality !== null && ($quality < 0 || $quality > 1)) {
+            throw new \InvalidArgumentException('Quality must be between 0.0 and 1.0');
+        }
+
         $this->quality = $quality;
 
         return $this;
     }
 
+    /**
+     * Set the maximum file size in MB (null = unlimited).
+     */
     public function maxFileSizeMb(?int $mb): static
     {
+        if ($mb !== null && $mb < 1) {
+            throw new \InvalidArgumentException('Max file size must be at least 1 MB');
+        }
+
         $this->maxFileSizeMb = $mb;
 
         return $this;
     }
 
+    /**
+     * Set the maximum number of pages to process (null = unlimited).
+     */
     public function maxPages(?int $pages): static
     {
+        if ($pages !== null && $pages < 1) {
+            throw new \InvalidArgumentException('Max pages must be at least 1');
+        }
+
         $this->maxPages = $pages;
 
         return $this;
     }
 
+    /**
+     * Enable or disable progress indicators.
+     */
     public function showProgress(bool $show = true): static
     {
         $this->showProgress = $show;
@@ -62,6 +110,9 @@ class FilamentPdfSanitizerPlugin
         return $this;
     }
 
+    /**
+     * Enable or disable error logging to console.
+     */
     public function logErrors(bool $log = true): static
     {
         $this->logErrors = $log;
@@ -109,6 +160,9 @@ class FilamentPdfSanitizerPlugin
         return Config::get('pdf-sanitizer.enabled', true);
     }
 
+    /**
+     * Register the plugin with the Filament panel.
+     */
     public function register(Panel $panel): void
     {
         if (! $this->isEnabled()) {
@@ -127,6 +181,14 @@ class FilamentPdfSanitizerPlugin
                 'logErrors' => $this->shouldLogErrors(),
             ])
         );
+    }
+
+    /**
+     * Boot the plugin when the panel is in-use.
+     */
+    public function boot(Panel $panel): void
+    {
+        // Plugin is ready to use when panel is active
     }
 }
 

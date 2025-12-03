@@ -20,18 +20,18 @@
     },
     "autoload": {
         "psr-4": {
-            "Filament\\PdfSanitizer\\": "src/"
+            "Laminblur\\FilamentPdfSanitizer\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Filament\\PdfSanitizer\\Tests\\": "tests/"
+            "Laminblur\\FilamentPdfSanitizer\\Tests\\": "tests/"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "Filament\\PdfSanitizer\\FilamentPdfSanitizerServiceProvider"
+                "Laminblur\\FilamentPdfSanitizer\\FilamentPdfSanitizerServiceProvider"
             ]
         }
     },

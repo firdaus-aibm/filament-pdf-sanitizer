@@ -101,7 +101,7 @@ namespace App\Providers\Filament;
 
 use Filament\Panel;
 use Filament\PanelProvider;
-use Filament\PdfSanitizer\FilamentPdfSanitizerPlugin;
+use Laminblur\FilamentPdfSanitizer\FilamentPdfSanitizerPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {

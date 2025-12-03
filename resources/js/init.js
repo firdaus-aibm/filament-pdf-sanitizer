@@ -4,7 +4,7 @@ let pdfSanitizerPromise = null;
 
 // Get config from window object
 function getConfig() {
-    const config = window.filamentPdfSanitizerConfig || {
+    return window.filamentPdfSanitizerConfig || {
         workerPath: '/vendor/filament-pdf-sanitizer/pdf.worker.min.js',
         scale: 1.5,
         quality: 0.85,
@@ -12,13 +12,6 @@ function getConfig() {
         maxPages: null,
         showProgress: true,
         logErrors: true,
-    };
-    
-    // Ensure boolean values are actually booleans (handle string conversions)
-    return {
-        ...config,
-        showProgress: config.showProgress === true || config.showProgress === 'true' || config.showProgress === 1 || config.showProgress === '1',
-        logErrors: config.logErrors === true || config.logErrors === 'true' || config.logErrors === 1 || config.logErrors === '1',
     };
 }
 
@@ -30,23 +23,9 @@ function loadPdfSanitizer() {
 
     if (!pdfSanitizerPromise) {
         const config = getConfig();
-        
-        // Debug log config (only if logging is enabled)
-        if (config.logErrors) {
-            console.log('[Filament PDF Sanitizer] Loading with config:', {
-                showProgress: config.showProgress,
-                logErrors: config.logErrors,
-                workerPath: config.workerPath,
-            });
-        }
-        
         pdfSanitizerPromise = import('./pdf-sanitizer.js').then(({ setupPdfSanitization }) => {
             setupPdfSanitization({ workerPath: config.workerPath });
             pdfSanitizerLoaded = true;
-            
-            if (config.logErrors) {
-                console.log('[Filament PDF Sanitizer] Sanitizer loaded successfully');
-            }
         }).catch((error) => {
             console.error('[Filament PDF Sanitizer] Failed to load sanitizer', error);
             pdfSanitizerPromise = null; // Reset on error

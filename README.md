@@ -1,4 +1,4 @@
-# Filament FileUpload PDF Sanitizer
+# Filament PDF Sanitizer
 
 [![Latest Version](https://img.shields.io/packagist/v/laminblur/filament-pdf-sanitizer?style=flat-square)](https://packagist.org/packages/laminblur/filament-pdf-sanitizer)
 [![License](https://img.shields.io/badge/license-MIT-brightgreen?style=flat-square)](LICENSE)
@@ -6,18 +6,18 @@
 [![Laravel](https://img.shields.io/badge/laravel-11%2B%20%7C%2012%2B-red?style=flat-square)](https://laravel.com)
 [![Filament](https://img.shields.io/badge/filament-3.x-orange?style=flat-square)](https://filamentphp.com)
 
-A Filament plugin that extends the FileUpload component with PDF sanitization capabilities. Automatically removes JavaScript, forms, annotations, and embedded scripts from PDF files before upload, preventing AWS WAF and other security systems from blocking PDF uploads that contain executable content.
+A Filament plugin that automatically sanitizes PDF files by removing JavaScript, forms, annotations, and embedded scripts before upload. This prevents AWS WAF and other security systems from blocking PDF uploads that contain executable content.
 
 ## 🎯 Problem Solved
 
-When uploading PDFs through Filament's FileUpload component, files containing embedded JavaScript or interactive elements can be blocked by security systems like AWS WAF (Web Application Firewall). This plugin extends the FileUpload component with a `->sanitize()` method that automatically sanitizes PDFs client-side before upload, ensuring they pass security checks while preserving all visual content.
+When uploading PDFs through Filament's FileUpload component, files containing embedded JavaScript or interactive elements can be blocked by security systems like AWS WAF (Web Application Firewall). This plugin automatically sanitizes PDFs client-side before upload, ensuring they pass security checks while preserving all visual content.
 
 ## ✨ Features
 
-- 🔒 **Selective PDF Sanitization** - Enable sanitization on specific FileUpload components with `->sanitize()`
-- 🚀 **Easy Integration** - Simple method call on any FileUpload component
-- ⚡ **Lazy Loading** - Only loads PDF libraries when sanitization is needed (reduces initial bundle size)
-- 🎯 **Transparent** - Works seamlessly with Filament FileUpload and Livewire without user intervention
+- 🔒 **Automatic PDF Sanitization** - Removes JavaScript, forms, and annotations from PDFs before upload
+- 🚀 **Zero Configuration** - Works out of the box with Filament FileUpload components
+- ⚡ **Lazy Loading** - Only loads PDF libraries when file inputs are detected (reduces initial bundle size)
+- 🎯 **Transparent** - Works seamlessly with Livewire file uploads without user intervention
 - 📦 **Lightweight** - Optimized bundle size with code splitting and dynamic imports
 - 🔄 **Smart Caching** - Caches sanitized files to prevent re-processing on retry
 - 🛡️ **WAF Compatible** - Prevents AWS WAF and other security systems from blocking uploads
@@ -92,7 +92,7 @@ npm run build
 
 ### Basic Usage
 
-Add the plugin to your Filament panel provider. This will add the `->sanitize()` method to all FileUpload components:
+Add the plugin to your Filament panel provider:
 
 ```php
 <?php
@@ -116,46 +116,7 @@ class AdminPanelProvider extends PanelProvider
 }
 ```
 
-### Using Sanitization on Specific FileUpload Components
-
-By default, the plugin does **not** sanitize PDFs automatically. You must explicitly enable sanitization on each FileUpload component using the `->sanitize()` method:
-
-```php
-use Filament\Forms\Components\FileUpload;
-
-FileUpload::make('document')
-    ->sanitize() // Enable PDF sanitization for this field
-    ->acceptedFileTypes(['application/pdf']),
-
-FileUpload::make('image')
-    ->acceptedFileTypes(['image/jpeg', 'image/png']),
-    // This field will NOT be sanitized (no ->sanitize() call)
-```
-
-**Example in a Resource Form:**
-
-```php
-use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Form;
-
-public function form(Form $form): Form
-{
-    return $form
-        ->schema([
-            FileUpload::make('contract')
-                ->label('Contract PDF')
-                ->sanitize() // Only this field will sanitize PDFs
-                ->acceptedFileTypes(['application/pdf'])
-                ->required(),
-                
-            FileUpload::make('photo')
-                ->label('Photo')
-                ->image()
-                ->acceptedFileTypes(['image/jpeg', 'image/png']),
-                // No sanitization needed for images
-        ]);
-}
-```
+That's it! The plugin will automatically sanitize all PDF uploads in your Filament panels.
 
 ### Configuration Options
 
@@ -275,14 +236,13 @@ return [
 
 ## 🔧 How It Works
 
-1. **Registration**: Plugin adds `->sanitize()` method to Filament's FileUpload component
-2. **Detection**: When a FileUpload with `->sanitize()` receives a PDF file, sanitization is triggered
-3. **Validation**: Checks file size and page count limits (if configured)
-4. **Sanitization**: Each PDF page is rendered to a canvas, converted to a JPEG image, and rebuilt as a clean PDF
-5. **Progress**: Shows visual progress indicator on the FileUpload component during sanitization (if enabled)
-6. **Interception**: The sanitized PDF replaces the original file before the upload request is sent
-7. **Caching**: Sanitized files are cached using WeakMap to prevent re-processing on retry
-8. **Cleanup**: Canvas elements and memory are automatically cleaned up after processing
+1. **Detection**: The plugin detects when a PDF file is selected in a file input
+2. **Validation**: Checks file size and page count limits (if configured)
+3. **Sanitization**: Each PDF page is rendered to a canvas, converted to a JPEG image, and rebuilt as a clean PDF
+4. **Progress**: Shows visual progress indicator during sanitization (if enabled)
+5. **Interception**: The sanitized PDF replaces the original file before the upload request is sent
+6. **Caching**: Sanitized files are cached using WeakMap to prevent re-processing on retry
+7. **Cleanup**: Canvas elements and memory are automatically cleaned up after processing
 
 ### What Gets Removed ❌
 
@@ -332,12 +292,10 @@ If you see errors about the PDF worker file:
 If uploads are still being blocked:
 
 1. ✅ Check that the plugin is registered in your panel provider
-2. ✅ Verify you've called `->sanitize()` on the FileUpload component
-3. ✅ Check that the FileUpload has `data-pdf-sanitize="true"` attribute in the HTML (inspect element)
-4. ✅ Verify the PDF worker file is accessible at the configured path
-5. ✅ Check browser console for JavaScript errors (enable logging with `->logErrors(true)`)
-6. ✅ Ensure npm dependencies are installed: `npm install jspdf pdfjs-dist`
-7. ✅ Rebuild assets: `npm run build`
+2. ✅ Verify the PDF worker file is accessible at the configured path
+3. ✅ Check browser console for JavaScript errors
+4. ✅ Ensure npm dependencies are installed: `npm install jspdf pdfjs-dist`
+5. ✅ Rebuild assets: `npm run build`
 
 ### Build Errors
 
@@ -348,24 +306,20 @@ If you encounter Vite build errors:
 3. Run `npm run build` to rebuild assets
 4. Clear Vite cache: `rm -rf node_modules/.vite` (Linux/Mac) or `Remove-Item -Recurse -Force node_modules\.vite` (Windows)
 
-### FileUpload Component Not Sanitizing
+### File Upload Not Working
 
-If FileUpload components with `->sanitize()` are not sanitizing PDFs:
+If file uploads stop working:
 
-1. Check browser console for errors (enable with `->logErrors(true)`)
-2. Verify the FileUpload component has `->sanitize()` method called
-3. Inspect the HTML to confirm `data-pdf-sanitize="true"` attribute exists on the input element
-4. Verify Livewire is properly initialized
-5. Ensure the plugin is only registered once (check for duplicate plugin registrations)
-6. Try clearing browser cache and rebuilding assets
-7. Check that the file is actually a PDF (check file type and extension)
+1. Check browser console for errors
+2. Verify Livewire is properly initialized
+3. Ensure the plugin is only registered once (check for duplicate plugin registrations)
+4. Try clearing browser cache and rebuilding assets
 
 ## 📊 Performance
 
-- **Initial Bundle Impact**: ~0KB (lazy loaded - only loads when FileUpload with `->sanitize()` detects a PDF)
-- **When Active**: ~800KB (pdfjs-dist + jspdf, loaded only when sanitization is needed)
+- **Initial Bundle Impact**: ~0KB (lazy loaded)
+- **When Active**: ~800KB (pdfjs-dist + jspdf, loaded only when PDF is detected)
 - **Sanitization Time**: ~1-3 seconds per PDF (depends on page count and complexity)
-- **Selective Processing**: Only FileUpload components with `->sanitize()` are processed, minimizing overhead
 
 ## 🤝 Contributing
 
@@ -383,8 +337,7 @@ This project is open-sourced software licensed under the [MIT license](LICENSE).
 
 ## 🙏 Acknowledgments
 
-- Built for [Filament PHP](https://filamentphp.com) FileUpload components
-- Extends Filament's FileUpload component with PDF sanitization capabilities
+- Built for [Filament PHP](https://filamentphp.com)
 - Uses [PDF.js](https://mozilla.github.io/pdf.js/) for PDF parsing
 - Uses [jsPDF](https://github.com/parallax/jsPDF) for PDF generation
 

@@ -1,5 +1,3 @@
-@include('filament-pdf-sanitizer::components.pdf-sanitizer-progress')
-
 <script>
     window.filamentPdfSanitizerConfig = {
         workerPath: @js($workerPath),
@@ -12,3 +10,4 @@
     };
 </script>
 @vite(['resources/js/vendor/filament-pdf-sanitizer/init.js'])
+

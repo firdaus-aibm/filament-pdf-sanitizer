@@ -192,4 +192,3 @@ class FilamentPdfSanitizerPlugin implements Plugin
         // Plugin is ready to use when panel is active
     }
 }
-

@@ -397,28 +397,18 @@ function initSanitization(workerPath) {
                 const originalFormData = options.body;
                 const entries = Array.from(originalFormData.entries());
                 const sanitizedEntries = [];
-                let needsSanitization = false;
+                let needsReplacement = false;
 
                 for (const [key, value] of entries) {
-                    if (value instanceof File && isPdfFile(value)) {
-                        needsSanitization = true;
-                        let sanitized;
-
-                        if (sanitizedFilesCache.has(value)) {
-                            sanitized = sanitizedFilesCache.get(value);
-                        } else {
-                            // Find the input element if possible
-                            const input = document.querySelector('input[type="file"]');
-                            sanitized = await sanitizeFileWithProgress(value, input);
-                        }
-
-                        sanitizedEntries.push([key, sanitized]);
+                    if (value instanceof File && isPdfFile(value) && sanitizedFilesCache.has(value)) {
+                        sanitizedEntries.push([key, sanitizedFilesCache.get(value)]);
+                        needsReplacement = true;
                     } else {
                         sanitizedEntries.push([key, value]);
                     }
                 }
 
-                if (needsSanitization) {
+                if (needsReplacement) {
                     const newFormData = new FormData();
                     for (const [key, value] of sanitizedEntries) {
                         if (value instanceof File) {
@@ -452,45 +442,18 @@ function initSanitization(workerPath) {
             if (isUploadRequest && body instanceof FormData) {
                 const entries = Array.from(body.entries());
                 const sanitizedEntries = [];
-                let needsSanitization = false;
+                let needsReplacement = false;
 
                 for (const [key, value] of entries) {
-                    if (value instanceof File && isPdfFile(value)) {
-                        needsSanitization = true;
-                        let sanitized;
-
-                        if (sanitizedFilesCache.has(value)) {
-                            sanitized = sanitizedFilesCache.get(value);
-                        } else {
-                            // This is async, so we need to handle it differently
-                            const self = this;
-                            (async () => {
-                                const input = document.querySelector('input[type="file"]');
-                                const sanitized = await sanitizeFileWithProgress(value, input);
-                                sanitizedFilesCache.set(value, sanitized);
-
-                                const newFormData = new FormData();
-                                for (const [k, v] of entries) {
-                                    if (v === value && v instanceof File) {
-                                        newFormData.append(k, sanitized, sanitized.name);
-                                    } else if (v instanceof File && v !== value) {
-                                        newFormData.append(k, v, v.name);
-                                    } else {
-                                        newFormData.append(k, v);
-                                    }
-                                }
-                                originalXHRSend.call(self, newFormData);
-                            })();
-                            return; // Don't send original request
-                        }
-
-                        sanitizedEntries.push([key, sanitized]);
+                    if (value instanceof File && isPdfFile(value) && sanitizedFilesCache.has(value)) {
+                        sanitizedEntries.push([key, sanitizedFilesCache.get(value)]);
+                        needsReplacement = true;
                     } else {
                         sanitizedEntries.push([key, value]);
                     }
                 }
 
-                if (needsSanitization && sanitizedEntries.every(([_, v]) => v instanceof File || !(v instanceof File))) {
+                if (needsReplacement) {
                     const newFormData = new FormData();
                     for (const [key, value] of sanitizedEntries) {
                         if (value instanceof File) {
@@ -551,24 +514,42 @@ function initSanitization(workerPath) {
         // Check if it's a file input with files
         if (input.type !== 'file' || !input.files || input.files.length === 0) return;
 
+        // Skip if this is our synthetic event after sanitization (let it reach Livewire)
+        if (input.dataset.sanitizerDispatched === 'true') {
+            delete input.dataset.sanitizerDispatched;
+            return;
+        }
+
         // Skip if already sanitizing (prevent infinite loop)
         if (input.dataset.sanitizing === 'true') {
             input.dataset.sanitizing = 'false';
             return;
         }
 
-        // Check if any files are PDFs
+        // Only sanitize when input has opted in via data-pdf-sanitize="true"
+        if (input.getAttribute('data-pdf-sanitize') !== 'true') {
+            const files = Array.from(input.files);
+            files.filter(isPdfFile).forEach((file) => sanitizedFilesCache.set(file, file));
+            return;
+        }
+
         const files = Array.from(input.files);
         const hasPdf = files.some(isPdfFile);
 
         if (hasPdf) {
             if (input.dataset.sanitizing !== 'true') {
+                e.stopImmediatePropagation();
+                e.preventDefault();
                 input.dataset.sanitizing = 'true';
                 sanitizeInputFiles(input).then(() => {
                     input.dataset.sanitizing = 'false';
+                    input.dataset.sanitizerDispatched = 'true';
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
                 }).catch((error) => {
                     logError('Sanitization error', error);
                     input.dataset.sanitizing = 'false';
+                    input.dataset.sanitizerDispatched = 'true';
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
                 });
             }
         }
@@ -586,9 +567,18 @@ function initSanitization(workerPath) {
 
                     // Use capture phase to intercept before Livewire
                     input.addEventListener('change', async function (e) {
-                        // Skip if already sanitizing (prevent infinite loop)
+                        if (this.dataset.sanitizerDispatched === 'true') {
+                            delete this.dataset.sanitizerDispatched;
+                            return;
+                        }
                         if (this.dataset.sanitizing === 'true') {
                             this.dataset.sanitizing = 'false';
+                            return;
+                        }
+
+                        if (this.getAttribute('data-pdf-sanitize') !== 'true') {
+                            const files = Array.from(this.files);
+                            files.filter(isPdfFile).forEach((file) => sanitizedFilesCache.set(file, file));
                             return;
                         }
 
@@ -597,12 +587,18 @@ function initSanitization(workerPath) {
 
                         if (hasPdf) {
                             if (this.dataset.sanitizing !== 'true') {
+                                e.stopImmediatePropagation();
+                                e.preventDefault();
                                 this.dataset.sanitizing = 'true';
                                 sanitizeInputFiles(this).then(() => {
                                     this.dataset.sanitizing = 'false';
+                                    this.dataset.sanitizerDispatched = 'true';
+                                    this.dispatchEvent(new Event('change', { bubbles: true }));
                                 }).catch((error) => {
                                     logError('Sanitization error', error);
                                     this.dataset.sanitizing = 'false';
+                                    this.dataset.sanitizerDispatched = 'true';
+                                    this.dispatchEvent(new Event('change', { bubbles: true }));
                                 });
                             }
                         }

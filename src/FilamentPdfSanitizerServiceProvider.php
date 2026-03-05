@@ -3,6 +3,7 @@
 namespace Laminblur\FilamentPdfSanitizer;
 
 use Exception;
+use Filament\Forms\Components\FileUpload;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
@@ -45,6 +46,23 @@ class FilamentPdfSanitizerServiceProvider extends ServiceProvider
         // Automatically ensure PDF worker file is available in public directory
         // This runs on every boot to ensure the file exists, but only copies if missing
         $this->ensureWorkerFileExists();
+
+        $this->registerFileUploadMacro();
+    }
+
+    /**
+     * Register the ->sanitize(bool) macro on Filament's FileUpload component.
+     * Only inputs that call ->sanitize() or ->sanitize(true) get PDF sanitization (opt-in).
+     */
+    protected function registerFileUploadMacro(): void
+    {
+        if (! class_exists(FileUpload::class)) {
+            return;
+        }
+
+        FileUpload::macro('sanitize', function (bool $value = true) {
+            return $this->extraInputAttributes(['data-pdf-sanitize' => $value ? 'true' : 'false'], true);
+        });
     }
 
     /**

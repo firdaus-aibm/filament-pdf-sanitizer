@@ -128,7 +128,29 @@ class AdminPanelProvider extends PanelProvider
 }
 ```
 
-That's it! The plugin will automatically sanitize all PDF uploads in your Filament panels.
+That's it! PDF sanitization is **opt-in per field**: only `FileUpload` inputs that call `->sanitize()` are sanitized (see below).
+
+### Per-field control (opt-in)
+
+Sanitization is **off** unless the field opts in. `FileUpload` inputs that do not call `->sanitize()` are not sanitized.
+
+- **Enable for a field:** `FileUpload::make('attachment')->sanitize()` or `->sanitize(true)`
+- **Explicitly disable:** `FileUpload::make('attachment')->sanitize(false)`
+
+Example:
+
+```php
+use Filament\Forms\Components\FileUpload;
+
+// This field's PDFs will be sanitized before upload
+FileUpload::make('document')
+    ->acceptedFileTypes(['application/pdf'])
+    ->sanitize(),
+
+// This field's PDFs are uploaded as-is (no sanitization)
+FileUpload::make('other_file')
+    ->acceptedFileTypes(['application/pdf']),
+```
 
 ### Configuration Options
 
